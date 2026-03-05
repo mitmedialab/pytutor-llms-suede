@@ -1,25 +1,53 @@
 {
   "customizations": {
     "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter"
+      ],
       "settings": {
         "[markdown]": {
           "editor.defaultFormatter": null
         },
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
         "editor.formatOnSave": true,
-        "editor.tabSize": 2
+        "editor.tabSize": 2,
+        "python.analysis.typeCheckingMode": "standard",
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+        "python.formatting.blackArgs": [
+          "--line-length=88"
+        ],
+        "python.formatting.provider": "black",
+        "python.terminal.activateEnvInCurrentTerminal": true,
+        "python.venvPath": "${containerWorkspaceFolder}/.venv"
       }
     },
     "pmalacho-mit/devcontainers": {
-      "ref": "devcontainer.common.json"
+      "ref": "devcontainer.poetry-default.json"
     }
   },
   "features": {
+    "ghcr.io/devcontainers-extra/features/poetry:latest": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/python:latest": {
+      "version": "3.12"
+    },
     "ghcr.io/guiyomh/features/vim:0": {},
     "ghcr.io/pmalacho-mit/devcontainer-features/git-subrepo:latest": {}
   },
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "initializeCommand": "mkdir -p ${HOME}/.local/share/opencode && touch ${HOME}/.local/share/opencode/auth.json",
   "mounts": [
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.local/share/opencode/auth.json,target=/home/vscode/.local/share/opencode/auth.json,type=bind,consistency=cached"
   ],
-  "postCreateCommand": "(grep -q 'IgnoreUnknown UseKeychain' ~/.ssh/config 2>/dev/null || sed -i '/UseKeychain/i IgnoreUnknown UseKeychain' ~/.ssh/config 2>/dev/null) && git config core.editor '/usr/bin/vim' && git config pull.rebase false && sudo curl -fsSL https://gist.githubusercontent.com/pmalacho-mit/d64caa8e16b0b0fdd5e58cc37a0ce242/raw/8f0f620d4a65f6f3d930ea14e7c2fdf382ef1bf1/codeblockify.sh -o /usr/local/bin/codeblockify && sudo chmod +x /usr/local/bin/codeblockify && sudo curl -fsSL https://raw.githubusercontent.com/pmalacho-mit/devcontainers/main/scripts/sync.sh -o /usr/local/bin/containersync && sudo chmod +x /usr/local/bin/containersync"
+  "postCreateCommand": "sudo curl -fsSL  https://raw.githubusercontent.com/pmalacho-mit/devcontainers/refs/heads/main/src/opencode/install.sh -o /usr/local/bin/opencode && sudo chmod +x /usr/local/bin/opencode && (grep -q 'IgnoreUnknown UseKeychain' ~/.ssh/config 2>/dev/null || sed -i '/UseKeychain/i IgnoreUnknown UseKeychain' ~/.ssh/config 2>/dev/null) && git config core.editor '/usr/bin/vim' && git config pull.rebase false && sudo curl -fsSL https://gist.githubusercontent.com/pmalacho-mit/d64caa8e16b0b0fdd5e58cc37a0ce242/raw/8f0f620d4a65f6f3d930ea14e7c2fdf382ef1bf1/codeblockify.sh -o /usr/local/bin/codeblockify && sudo chmod +x /usr/local/bin/codeblockify && sudo curl -fsSL https://raw.githubusercontent.com/pmalacho-mit/devcontainers/main/scripts/sync.sh -o /usr/local/bin/containersync && sudo chmod +x /usr/local/bin/containersync && curl -fsSL https://raw.githubusercontent.com/pmalacho-mit/devcontainers/refs/heads/main/src/difftastic/install.sh | sudo install -m 0755 /dev/stdin /usr/local/bin/difftastic",
+  "remoteEnv": {
+    "POETRY_VIRTUALENVS_IN_PROJECT": "true"
+  }
 }
