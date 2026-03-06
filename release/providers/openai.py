@@ -1,13 +1,20 @@
-from release.providers.base import Provider, GetTextStream
+from .base import Provider, GetTextStream
+
+from dataclasses import dataclass
 
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 
 
-openai_client = AsyncOpenAI()
+client = AsyncOpenAI()
 
 
-def content_from_openai_chunk(chunk: ChatCompletionChunk) -> str | None:
+@dataclass(frozen=True, kw_only=True)
+class OpenAIModelMetadata:
+    pass
+
+
+def content_from_chunk(chunk: ChatCompletionChunk) -> str | None:
     if not getattr(chunk, "choices", None):
         return None
 
@@ -23,7 +30,7 @@ def content_from_openai_chunk(chunk: ChatCompletionChunk) -> str | None:
 
 
 async def produce_chunks(request: "Provider.TextStream.Request"):
-    return await openai_client.chat.completions.create(
+    return await client.chat.completions.create(
         model=request.model,
         messages=request.messages,
         stream=True,
@@ -35,11 +42,11 @@ class OpenAIProvider(Provider):
         if not request.model.startswith("gpt"):
             return None
 
-        async def start():
-            return Provider.TextStream.Stream(
+        async def stream():
+            return Provider.TextStream.FromChunks(
                 request,
                 chunk_producer=produce_chunks,
-                content_from_chunk=content_from_openai_chunk,
+                content_from_chunk=content_from_chunk,
             )
 
-        return start
+        return stream
