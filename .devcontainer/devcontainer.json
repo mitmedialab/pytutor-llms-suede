@@ -5,7 +5,8 @@
         "anthropic.claude-code",
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-python.black-formatter"
+        "ms-python.black-formatter",
+        "tamasfe.even-better-toml"
       ],
       "settings": {
         "[markdown]": {
@@ -16,6 +17,8 @@
         },
         "editor.formatOnSave": true,
         "editor.tabSize": 2,
+        "python-envs.defaultEnvManager": "ms-python.python:poetry",
+        "python-envs.defaultPackageManager": "ms-python.python:poetry",
         "python.analysis.typeCheckingMode": "standard",
         "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
         "python.formatting.blackArgs": [
