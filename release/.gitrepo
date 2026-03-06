@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/mitmedialab/pytutor-llms-suede
 	branch = release
-	commit = f765f6e78ed2b84e4beff5b7005c5d33e5b7ac7c
-	parent = cec336bfd65acdff6bc97737d2df42dae897d0ff
+	commit = ec812a40365986eaebbdf85c4ac6df1d5052f061
+	parent = 1ba256e2c407edd8a5f4fb573832d1473e9d89ef
 	method = merge
 	cmdver = 0.4.9
