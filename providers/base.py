@@ -1,5 +1,6 @@
-from release.common import Msg, OnText, TextChunk
+from ..common import Msg, OnText, TextChunk
 
+from dataclasses import dataclass, field
 from pydantic import BaseModel
 
 from abc import ABC, abstractmethod
@@ -10,14 +11,31 @@ from typing import (
     List,
     Optional,
     Sequence,
+    TYPE_CHECKING,
     TypeVar,
 )
+
+if TYPE_CHECKING:
+    from .anthropic import AnthropicModelMetadata
+    from .google import GoogleModelMetadata
+    from .openai import OpenAIModelMetadata
+    from .openrouter import OpenRouterModelMetadata
+
+    type ModelMetadata = (
+        OpenAIModelMetadata
+        | AnthropicModelMetadata
+        | GoogleModelMetadata
+        | OpenRouterModelMetadata
+    )
+else:
+    type ModelMetadata = object
 
 type TextStream = AsyncIterator[str]
 type GetTextStream = Callable[[], Awaitable[TextStream]]
 type Interrupt = Callable[[], bool]
 
 ChunkT = TypeVar("ChunkT")
+MetadataT = TypeVar("MetadataT")
 type ChunkProducer[T] = Callable[
     ["Provider.TextStream.Request"], Awaitable[AsyncIterator[T]]
 ]
@@ -25,18 +43,38 @@ type ContentFromChunk[T] = Callable[[T], str | None]
 
 
 class Base:
-    class Callbacks(BaseModel):
+    @dataclass(frozen=True, kw_only=True)
+    class Callbacks:
         error: Optional[Callable[[Exception], None]] = None
 
-    class Request(BaseModel):
+    @dataclass(frozen=True, kw_only=True)
+    class Request:
         messages: List[Msg]
         model: str
-        interrupt: Optional[Interrupt]
+        model_metadata: frozenset[ModelMetadata] = field(default_factory=frozenset)
+        interrupt: Optional[Interrupt] = None
 
 
 class Provider(ABC):
+    @classmethod
+    def model_metadata(
+        cls,
+        request: Base.Request,
+        metadata_type: type[MetadataT],
+    ) -> MetadataT | None:
+        return next(
+            (
+                metadata
+                for metadata in request.model_metadata
+                if isinstance(metadata, metadata_type)
+            ),
+            None,
+        )
+
     class TextStream:
+        @dataclass(frozen=True, kw_only=True)
         class Request(Base.Request):
+            @dataclass(frozen=True, kw_only=True)
             class Callbacks(Base.Callbacks):
                 chunk: OnText
                 done: Optional[OnText] = None
@@ -44,7 +82,7 @@ class Provider(ABC):
             on: Callbacks
 
         @classmethod
-        async def Stream(
+        async def FromChunks(
             cls,
             request: Request,
             *,
