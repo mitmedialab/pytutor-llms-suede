@@ -1,10 +1,9 @@
 from .base import Provider, GetTextStream
 
-from dataclasses import dataclass
-
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 
+from dataclasses import dataclass
 
 client = AsyncOpenAI()
 

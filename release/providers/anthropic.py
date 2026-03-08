@@ -1,9 +1,6 @@
 from .base import GetTextStream, Provider
 from .msg_content import Part, normalize_messages
 
-from dataclasses import dataclass
-from typing import Any, cast
-
 from anthropic import AsyncAnthropic
 from anthropic.types import (
     MessageParam,
@@ -11,6 +8,9 @@ from anthropic.types import (
     RawMessageStreamEvent,
     TextDelta,
 )
+
+from dataclasses import dataclass
+from typing import Any, cast
 
 
 client = AsyncAnthropic()
@@ -29,7 +29,7 @@ SUPPORTED_IMAGE_MEDIA_TYPES = {
 }
 
 
-def _to_anthropic_messages(request: "Provider.TextStream.Request"):
+def _to_messages(request: "Provider.TextStream.Request"):
     system_prompt, normalized = normalize_messages(request.messages)
     messages: list[MessageParam] = []
 
@@ -94,7 +94,7 @@ def content_from_chunk(chunk: RawMessageStreamEvent) -> str | None:
 
 
 async def produce_chunks(request: "Provider.TextStream.Request"):
-    system_prompt, messages = _to_anthropic_messages(request)
+    system_prompt, messages = _to_messages(request)
     anthropic_metadata = Provider.model_metadata(request, AnthropicModelMetadata)
     max_tokens = (
         anthropic_metadata.max_tokens

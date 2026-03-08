@@ -1,12 +1,11 @@
-import os
-
 from .base import GetTextStream, Provider
 from .openai import content_from_chunk
 
-from dataclasses import dataclass
-
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
+
+from dataclasses import dataclass
+import os
 
 
 client = AsyncOpenAI(

@@ -1,11 +1,10 @@
 from .base import GetTextStream, Provider
 from .msg_content import Part, normalize_messages
 
-from dataclasses import dataclass
-
 from google import genai
 from google.genai import types as genai_types
 
+from dataclasses import dataclass
 import mimetypes
 
 client = genai.Client()
@@ -16,7 +15,7 @@ class GoogleModelMetadata:
     thinking_level: genai_types.ThinkingLevel | None = None
 
 
-def _google_config_from_metadata(
+def _config_from_metadata(
     model_metadata: GoogleModelMetadata | None,
 ) -> genai_types.GenerateContentConfigDict:
     config: genai_types.GenerateContentConfigDict = {}
@@ -34,7 +33,7 @@ def _google_config_from_metadata(
     return config
 
 
-def _to_google_input(request: "Provider.TextStream.Request"):
+def _to_messages(request: "Provider.TextStream.Request"):
     system_prompt, normalized = normalize_messages(request.messages)
     contents: list[genai_types.Content] = []
 
@@ -77,7 +76,7 @@ def _to_google_input(request: "Provider.TextStream.Request"):
             )
         )
 
-    config = _google_config_from_metadata(
+    config = _config_from_metadata(
         Provider.model_metadata(request, GoogleModelMetadata)
     )
     if system_prompt:
@@ -113,7 +112,7 @@ def content_from_chunk(chunk: genai_types.GenerateContentResponse) -> str | None
 
 
 async def produce_chunks(request: "Provider.TextStream.Request"):
-    contents, config = _to_google_input(request)
+    contents, config = _to_messages(request)
     return await client.aio.models.generate_content_stream(
         model=request.model,
         contents=contents,
