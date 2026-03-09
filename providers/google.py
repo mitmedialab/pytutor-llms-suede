@@ -1,14 +1,21 @@
-from .base import GetTextStream, Provider
+from .base import GetPydanticStream, GetTextStream, Provider
 from .msg_content import Part, normalize_messages
 
-from dataclasses import dataclass
-
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types as genai_types
+import instructor
+from pydantic import BaseModel
 
+from dataclasses import dataclass
 import mimetypes
+import os
 
-client = genai.Client()
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+
+client = genai.Client(api_key=api_key)
+instructor_client = instructor.from_genai(client, use_async=True)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -16,7 +23,7 @@ class GoogleModelMetadata:
     thinking_level: genai_types.ThinkingLevel | None = None
 
 
-def _google_config_from_metadata(
+def _config_from_metadata(
     model_metadata: GoogleModelMetadata | None,
 ) -> genai_types.GenerateContentConfigDict:
     config: genai_types.GenerateContentConfigDict = {}
@@ -34,7 +41,7 @@ def _google_config_from_metadata(
     return config
 
 
-def _to_google_input(request: "Provider.TextStream.Request"):
+def _to_messages(request: "Provider.TextStream.Request"):
     system_prompt, normalized = normalize_messages(request.messages)
     contents: list[genai_types.Content] = []
 
@@ -77,7 +84,7 @@ def _to_google_input(request: "Provider.TextStream.Request"):
             )
         )
 
-    config = _google_config_from_metadata(
+    config = _config_from_metadata(
         Provider.model_metadata(request, GoogleModelMetadata)
     )
     if system_prompt:
@@ -88,7 +95,7 @@ def _to_google_input(request: "Provider.TextStream.Request"):
     return contents, final_config
 
 
-def content_from_chunk(chunk: genai_types.GenerateContentResponse) -> str | None:
+def delta_content_from_chunk(chunk: genai_types.GenerateContentResponse) -> str | None:
     text = getattr(chunk, "text", None)
     if text:
         return text
@@ -112,12 +119,22 @@ def content_from_chunk(chunk: genai_types.GenerateContentResponse) -> str | None
     return "".join(texts)
 
 
-async def produce_chunks(request: "Provider.TextStream.Request"):
-    contents, config = _to_google_input(request)
+async def produce_raw_chunks(request: "Provider.TextStream.Request"):
+    contents, config = _to_messages(request)
     return await client.aio.models.generate_content_stream(
         model=request.model,
         contents=contents,
         config=config,
+    )
+
+
+async def produce_pydantic_models[ModelT: BaseModel](
+    request: "Provider.PydanticStream.Request[ModelT]",
+):
+    return instructor_client.chat.completions.create_partial(
+        response_model=request.type,
+        model=request.model,
+        messages=request.messages,
     )
 
 
@@ -129,8 +146,23 @@ class GoogleProvider(Provider):
         async def stream():
             return Provider.TextStream.FromChunks(
                 request,
-                chunk_producer=produce_chunks,
-                content_from_chunk=content_from_chunk,
+                raw_chunk_producer=produce_raw_chunks,
+                delta_content_from_chunk=delta_content_from_chunk,
+            )
+
+        return stream
+
+    async def try_prepare_pydantic_stream[ModelT: BaseModel](
+        self,
+        request: "Provider.PydanticStream.Request[ModelT]",
+    ) -> GetPydanticStream[ModelT] | None:
+        if not request.model.startswith(("gemini", "learnlm")):
+            return None
+
+        async def stream():
+            return Provider.PydanticStream.FromModels(
+                request,
+                model_producer=produce_pydantic_models,
             )
 
         return stream

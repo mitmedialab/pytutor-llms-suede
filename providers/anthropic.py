@@ -1,8 +1,5 @@
-from .base import GetTextStream, Provider
+from .base import GetPydanticStream, GetTextStream, Provider
 from .msg_content import Part, normalize_messages
-
-from dataclasses import dataclass
-from typing import Any, cast
 
 from anthropic import AsyncAnthropic
 from anthropic.types import (
@@ -11,9 +8,19 @@ from anthropic.types import (
     RawMessageStreamEvent,
     TextDelta,
 )
+from dotenv import load_dotenv
+import instructor
+from pydantic import BaseModel
 
+from dataclasses import dataclass
+import os
+from typing import Any, cast
 
-client = AsyncAnthropic()
+load_dotenv()
+api_key = os.getenv("CLAUDE_API_KEY")
+
+client = AsyncAnthropic(api_key=api_key)
+instructor_client = instructor.from_anthropic(client)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -29,7 +36,7 @@ SUPPORTED_IMAGE_MEDIA_TYPES = {
 }
 
 
-def _to_anthropic_messages(request: "Provider.TextStream.Request"):
+def _to_messages(request: "Provider.TextStream.Request"):
     system_prompt, normalized = normalize_messages(request.messages)
     messages: list[MessageParam] = []
 
@@ -80,7 +87,7 @@ def _to_anthropic_messages(request: "Provider.TextStream.Request"):
     return system_prompt, messages
 
 
-def content_from_chunk(chunk: RawMessageStreamEvent) -> str | None:
+def delta_content_from_chunk(chunk: RawMessageStreamEvent) -> str | None:
     if not isinstance(chunk, RawContentBlockDeltaEvent):
         return None
 
@@ -93,8 +100,8 @@ def content_from_chunk(chunk: RawMessageStreamEvent) -> str | None:
     return chunk.delta.text
 
 
-async def produce_chunks(request: "Provider.TextStream.Request"):
-    system_prompt, messages = _to_anthropic_messages(request)
+async def produce_raw_chunks(request: "Provider.TextStream.Request"):
+    system_prompt, messages = _to_messages(request)
     anthropic_metadata = Provider.model_metadata(request, AnthropicModelMetadata)
     max_tokens = (
         anthropic_metadata.max_tokens
@@ -114,6 +121,24 @@ async def produce_chunks(request: "Provider.TextStream.Request"):
     return await client.messages.create(**create_args)
 
 
+async def produce_pydantic_models[ModelT: BaseModel](
+    request: "Provider.PydanticStream.Request[ModelT]",
+):
+    anthropic_metadata = Provider.model_metadata(request, AnthropicModelMetadata)
+    max_tokens = (
+        anthropic_metadata.max_tokens
+        if anthropic_metadata and anthropic_metadata.max_tokens is not None
+        else 4096
+    )
+
+    return instructor_client.chat.completions.create_partial(
+        response_model=request.type,
+        model=request.model,
+        messages=request.messages,
+        max_tokens=max_tokens,
+    )
+
+
 class AnthropicProvider(Provider):
     async def try_prepare_text_stream(self, request) -> GetTextStream | None:
         if not request.model.startswith("claude"):
@@ -122,8 +147,23 @@ class AnthropicProvider(Provider):
         async def stream():
             return Provider.TextStream.FromChunks(
                 request,
-                chunk_producer=produce_chunks,
-                content_from_chunk=content_from_chunk,
+                raw_chunk_producer=produce_raw_chunks,
+                delta_content_from_chunk=delta_content_from_chunk,
+            )
+
+        return stream
+
+    async def try_prepare_pydantic_stream[ModelT: BaseModel](
+        self,
+        request: "Provider.PydanticStream.Request[ModelT]",
+    ) -> GetPydanticStream[ModelT] | None:
+        if not request.model.startswith("claude"):
+            return None
+
+        async def stream():
+            return Provider.PydanticStream.FromModels(
+                request,
+                model_producer=produce_pydantic_models,
             )
 
         return stream
