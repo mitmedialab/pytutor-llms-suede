@@ -1,19 +1,22 @@
-from .base import Provider, GetTextStream
+from .base import Provider, GetPydanticStream
 
-from openai import AsyncOpenAI
+from dotenv import load_dotenv
+import instructor
+from openai import AsyncOpenAI, api_key
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
+from pydantic import BaseModel
 
 from dataclasses import dataclass
+import os
 
-client = AsyncOpenAI()
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+
+client = AsyncOpenAI(api_key=api_key)
+instructor_client = instructor.from_openai(client)
 
 
-@dataclass(frozen=True, kw_only=True)
-class OpenAIModelMetadata:
-    pass
-
-
-def content_from_chunk(chunk: ChatCompletionChunk) -> str | None:
+def delta_content_from_chunk(chunk: ChatCompletionChunk) -> str | None:
     if not getattr(chunk, "choices", None):
         return None
 
@@ -28,7 +31,7 @@ def content_from_chunk(chunk: ChatCompletionChunk) -> str | None:
     return content
 
 
-async def produce_chunks(request: "Provider.TextStream.Request"):
+async def produce_raw_chunks(request: "Provider.TextStream.Request"):
     return await client.chat.completions.create(
         model=request.model,
         messages=request.messages,
@@ -36,16 +39,45 @@ async def produce_chunks(request: "Provider.TextStream.Request"):
     )
 
 
+async def produce_pydantic_models[ModelT: BaseModel](
+    request: "Provider.PydanticStream.Request[ModelT]",
+):
+    return instructor_client.chat.completions.create_partial(
+        response_model=request.type,
+        model=request.model,
+        messages=request.messages,
+    )
+
+
 class OpenAIProvider(Provider):
-    async def try_prepare_text_stream(self, request) -> GetTextStream | None:
+    @dataclass(frozen=True, kw_only=True)
+    class ModelMetadata:
+        pass
+
+    async def try_prepare_text_stream(self, request):
         if not request.model.startswith("gpt"):
             return None
 
         async def stream():
             return Provider.TextStream.FromChunks(
                 request,
-                chunk_producer=produce_chunks,
-                content_from_chunk=content_from_chunk,
+                raw_chunk_producer=produce_raw_chunks,
+                delta_content_from_chunk=delta_content_from_chunk,
+            )
+
+        return stream
+
+    async def try_prepare_pydantic_stream[ModelT: BaseModel](
+        self,
+        request: "Provider.PydanticStream.Request[ModelT]",
+    ) -> GetPydanticStream[ModelT] | None:
+        if not request.model.startswith("gpt"):
+            return None
+
+        async def stream():
+            return Provider.PydanticStream.FromModels(
+                request,
+                model_producer=produce_pydantic_models,
             )
 
         return stream

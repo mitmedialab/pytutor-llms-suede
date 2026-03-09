@@ -1,1 +1,1 @@
-from .base import select_text_stream
+from .base import Provider
