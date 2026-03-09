@@ -81,6 +81,13 @@ class Base:
 
 class Provider(ABC):
     @staticmethod
+    async def _Collect[ItemT](stream: AsyncIterator[ItemT]) -> list[ItemT]:
+        items: list[ItemT] = []
+        async for item in stream:
+            items.append(item)
+        return items
+
+    @staticmethod
     async def _Select[RequestT: Base.Request, StreamT](
         request: RequestT,
         providers: Sequence["Provider"],
@@ -169,6 +176,13 @@ class Provider(ABC):
                 lambda provider, req: provider.try_prepare_text_stream(req),
             )
 
+        @classmethod
+        async def Collect(
+            cls,
+            stream: TextStream,
+        ) -> list[Event.Text | Event.Error]:
+            return await Provider._Collect(stream)
+
     class PydanticStream:
         @dataclass(frozen=True, kw_only=True)
         class Request[ModelT: BaseModel](Base.Request):
@@ -211,6 +225,13 @@ class Provider(ABC):
                 lambda provider, req: provider.try_prepare_pydantic_stream(req),
             )
 
+        @classmethod
+        async def Collect[ModelT: BaseModel](
+            cls,
+            stream: PydanticStream[ModelT],
+        ) -> list[Event.Pydantic[ModelT] | Event.Error]:
+            return await Provider._Collect(stream)
+
     class SchemaStream:
         @dataclass(frozen=True, kw_only=True)
         class Request(Base.Request):
@@ -232,6 +253,13 @@ class Provider(ABC):
                 type=model_type,
             )
             return await Provider.PydanticStream.Select(pydantic_request, *providers)
+
+        @classmethod
+        async def Collect(
+            cls,
+            stream: SchemaStream,
+        ) -> list[Event.Pydantic[BaseModel] | Event.Error]:
+            return await Provider._Collect(stream)
 
     @abstractmethod
     async def try_prepare_text_stream(
