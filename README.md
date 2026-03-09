@@ -11,6 +11,10 @@ bash <(curl https://suede.sh/install-release) --repo mitmedialab/pytutor-llms-su
 ```
 
 <details>
+
+## Testing
+
+See [TESTING.md](TESTING.md) for the full testing strategy, recommended libraries, and how to run the suite.
 <summary>
 See alternative to using <a href="https://github.com/pmalacho-mit/suede#suedesh">suede.sh</a> script proxy
 </summary>
