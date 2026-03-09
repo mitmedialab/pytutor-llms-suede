@@ -47,13 +47,45 @@ The tests run without real API keys by setting dummy credentials in `tests/conft
 /workspaces/pytutor-llms-suede/.venv/bin/python -m pytest -q
 ```
 
+Using the helper script:
+
+```bash
+./scripts/run-tests.sh
+./scripts/run-tests.sh tests/test_provider_base.py
+./scripts/run-tests.sh tests/test_provider_base.py::test_text_stream_collect_collects_all_events
+```
+
 With coverage:
 
 ```bash
 /workspaces/pytutor-llms-suede/.venv/bin/python -m pytest --cov=release --cov-report=term-missing
 ```
 
-## 5) CI Recommendations
+## 5) Provider Benchmarks (opt-in)
+
+Provider benchmark tests live in `tests/test_provider_benchmarks.py` and are skipped by default.
+
+To run them, pass the explicit opt-in flag:
+
+```bash
+./scripts/run-tests.sh tests/test_provider_benchmarks.py --run-provider-benchmarks -s
+```
+
+Required env vars (real keys):
+
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `CLAUDE_API_KEY`
+- `OPENROUTER_API_KEY`
+
+Optional model overrides:
+
+- `BENCHMARK_OPENAI_MODEL` (default `gpt-4o-mini`)
+- `BENCHMARK_GOOGLE_MODEL` (default `gemini-2.0-flash`)
+- `BENCHMARK_ANTHROPIC_MODEL` (default `claude-3-5-haiku-latest`)
+- `BENCHMARK_OPENROUTER_MODEL` (default `openrouter/openai/gpt-4o-mini`)
+
+## 6) CI Recommendations
 
 Use this minimum quality gate for future development:
 
@@ -62,7 +94,7 @@ Use this minimum quality gate for future development:
 - start with coverage floor at 85% and raise over time
 - keep integration tests in a separate workflow requiring provider secrets
 
-## 6) Adding New Providers
+## 7) Adding New Providers
 
 For each new provider:
 

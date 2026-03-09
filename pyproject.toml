@@ -22,6 +22,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-ra"
 asyncio_mode = "auto"
+markers = [
+    "benchmark: long-running live provider benchmark tests",
+]
 
 
 [build-system]
