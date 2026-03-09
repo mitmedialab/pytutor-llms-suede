@@ -9,13 +9,11 @@ from pydantic import BaseModel
 from release import Provider
 
 from release.providers.anthropic import (
-    AnthropicModelMetadata,
     AnthropicProvider,
     SUPPORTED_IMAGE_MEDIA_TYPES,
     _to_messages as anthropic_to_messages,
 )
 from release.providers.google import (
-    GoogleModelMetadata,
     GoogleProvider,
     _config_from_metadata,
     _to_messages as google_to_messages,
@@ -58,7 +56,7 @@ def test_openai_delta_content_from_chunk() -> None:
 
 
 def test_google_config_from_metadata() -> None:
-    metadata = GoogleModelMetadata(thinking_level=genai_types.ThinkingLevel.HIGH)
+    metadata = GoogleProvider.ModelMetadata(thinking_level="high")
     config = _config_from_metadata(metadata)
     assert config == {
         "thinking_config": {"thinking_level": genai_types.ThinkingLevel.HIGH}
@@ -113,7 +111,7 @@ def test_anthropic_to_messages_filters_unsupported_data_images() -> None:
                 ],
             }
         ],
-        model_metadata=[AnthropicModelMetadata(max_tokens=100)],
+        model_metadata=[AnthropicProvider.ModelMetadata(max_tokens=100)],
     )
 
     system_prompt, messages = anthropic_to_messages(request)

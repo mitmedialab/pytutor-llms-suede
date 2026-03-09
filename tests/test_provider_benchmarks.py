@@ -1,15 +1,15 @@
-from dataclasses import dataclass
-import os
-from time import perf_counter
-from typing import TypedDict
-
-import pytest
-
 from release import Provider
 from release.providers.anthropic import AnthropicProvider
 from release.providers.google import GoogleProvider
 from release.providers.openai import OpenAIProvider
 from release.providers.openrouter import OpenRouterProvider
+
+import pytest
+
+from dataclasses import dataclass, field
+import os
+from time import perf_counter
+from typing import Any, TypedDict
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,7 @@ class BenchmarkCase:
     model_env: str
     model_default: str
     key_env: str
+    model_metadata: list[Any] = field(default_factory=list)
 
 
 class BenchmarkMetrics(TypedDict):
@@ -30,36 +31,49 @@ class BenchmarkMetrics(TypedDict):
     chars: int
     chunks_per_s: float
     chars_per_s: float
+    accumulated: str
 
 
 CASES = [
     BenchmarkCase(
-        name="openai",
+        name="openai 4o",
         provider=OpenAIProvider(),
         model_env="BENCHMARK_OPENAI_MODEL",
-        model_default="gpt-4o-mini",
+        model_default="gpt-4o",
         key_env="OPENAI_API_KEY",
+        model_metadata=[OpenAIProvider.ModelMetadata()],
+    ),
+    BenchmarkCase(
+        name="openai 5.2",
+        provider=OpenAIProvider(),
+        model_env="BENCHMARK_OPENAI_MODEL",
+        model_default="gpt-5.2-2025-12-11",
+        key_env="OPENAI_API_KEY",
+        model_metadata=[OpenAIProvider.ModelMetadata()],
     ),
     BenchmarkCase(
         name="google",
         provider=GoogleProvider(),
         model_env="BENCHMARK_GOOGLE_MODEL",
-        model_default="gemini-2.0-flash",
+        model_default="gemini-3-flash-preview",
         key_env="GEMINI_API_KEY",
+        model_metadata=[GoogleProvider.ModelMetadata(thinking_level="minimal")],
     ),
     BenchmarkCase(
         name="anthropic",
         provider=AnthropicProvider(),
         model_env="BENCHMARK_ANTHROPIC_MODEL",
-        model_default="claude-3-5-haiku-latest",
+        model_default="claude-sonnet-4-5-20250929",
         key_env="CLAUDE_API_KEY",
+        model_metadata=[AnthropicProvider.ModelMetadata()],
     ),
     BenchmarkCase(
         name="openrouter",
         provider=OpenRouterProvider(),
         model_env="BENCHMARK_OPENROUTER_MODEL",
-        model_default="openrouter/openai/gpt-4o-mini",
+        model_default="moonshotai/kimi-k2.5",
         key_env="OPENROUTER_API_KEY",
+        model_metadata=[OpenRouterProvider.ModelMetadata(reasoning_enabled=False)],
     ),
 ]
 
@@ -72,6 +86,7 @@ def _real_key_present(key_name: str) -> bool:
 async def _measure_text_stream(case: BenchmarkCase, model: str) -> BenchmarkMetrics:
     request = Provider.TextStream.Request(
         model=model,
+        model_metadata=case.model_metadata,
         messages=[
             {"role": "system", "content": "You are concise."},
             {
@@ -85,6 +100,7 @@ async def _measure_text_stream(case: BenchmarkCase, model: str) -> BenchmarkMetr
     first_chunk_at: float | None = None
     chunk_count = 0
     char_count = 0
+    accumulated_message = ""
 
     stream = await Provider.TextStream.Select(request, case.provider)
 
@@ -97,6 +113,7 @@ async def _measure_text_stream(case: BenchmarkCase, model: str) -> BenchmarkMetr
 
         chunk_count += 1
         char_count += len(event.payload.delta)
+        accumulated_message = event.payload.accumulated
 
     end = perf_counter()
 
@@ -115,6 +132,7 @@ async def _measure_text_stream(case: BenchmarkCase, model: str) -> BenchmarkMetr
         "chars": char_count,
         "chunks_per_s": chunk_count / total_s,
         "chars_per_s": char_count / total_s,
+        "accumulated": accumulated_message,
     }
 
 
@@ -141,7 +159,8 @@ async def test_provider_text_stream_benchmark(
         f"chunks={metrics['chunks']} "
         f"chars={metrics['chars']} "
         f"chunks/s={metrics['chunks_per_s']:.2f} "
-        f"chars/s={metrics['chars_per_s']:.2f}"
+        f"chars/s={metrics['chars_per_s']:.2f}\n"
+        f"accumulated={metrics['accumulated']!r}"
     )
 
     assert metrics["ttfc_s"] >= 0

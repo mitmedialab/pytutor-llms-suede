@@ -31,4 +31,22 @@ if [[ $# -eq 0 ]]; then
   exec "$PYTHON_BIN" -m pytest -q tests
 fi
 
-exec "$PYTHON_BIN" -m pytest -q "$@"
+ARGS=("$@")
+RUN_BENCHMARKS=false
+HAS_CAPTURE_FLAG=false
+
+for arg in "${ARGS[@]}"; do
+  if [[ "$arg" == "--run-provider-benchmarks" ]]; then
+    RUN_BENCHMARKS=true
+  fi
+
+  if [[ "$arg" == "-s" || "$arg" == --capture=* || "$arg" == "--capture" ]]; then
+    HAS_CAPTURE_FLAG=true
+  fi
+done
+
+if [[ "$RUN_BENCHMARKS" == true && "$HAS_CAPTURE_FLAG" == false ]]; then
+  ARGS+=("--capture=tee-sys")
+fi
+
+exec "$PYTHON_BIN" -m pytest -q "${ARGS[@]}"
