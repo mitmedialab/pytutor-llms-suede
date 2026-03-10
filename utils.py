@@ -5,7 +5,14 @@ from pydantic import BaseModel
 import json
 
 
+_SCHEMA_MODEL_CACHE: dict[str, type[BaseModel]] = {}
+
+
 def build_from_json_schema(json_schema: str) -> type[BaseModel]:
+    cached_model = _SCHEMA_MODEL_CACHE.get(json_schema)
+    if cached_model is not None:
+        return cached_model
+
     obj = json.loads(json_schema)
     title = obj.get("title")
 
@@ -21,20 +28,26 @@ def build_from_json_schema(json_schema: str) -> type[BaseModel]:
     namespace: dict[str, object] = {}
     exec(generated, namespace)
 
-    if isinstance(title, str):
-        model = namespace.get(title)
-        if isinstance(model, type) and issubclass(model, BaseModel):
-            return model
-
-    fallback_models = [
+    generated_models = [
         value
         for value in namespace.values()
         if isinstance(value, type)
         and issubclass(value, BaseModel)
         and value is not BaseModel
     ]
-    if fallback_models:
-        return fallback_models[0]
+
+    for generated_model in generated_models:
+        generated_model.model_rebuild(_types_namespace=namespace)
+
+    if isinstance(title, str):
+        model = namespace.get(title)
+        if isinstance(model, type) and issubclass(model, BaseModel):
+            _SCHEMA_MODEL_CACHE[json_schema] = model
+            return model
+
+    if generated_models:
+        _SCHEMA_MODEL_CACHE[json_schema] = generated_models[0]
+        return generated_models[0]
 
     raise ValueError("No pydantic model class found in generated code")
 
