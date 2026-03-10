@@ -74,7 +74,7 @@ async def produce_pydantic_models[ModelT: BaseModel](
     if reasoning is not None:
         create_args["extra_body"] = {"reasoning": reasoning}
 
-    return instructor_client.chat.completions.create_partial(**create_args)
+    return instructor_client.create_partial(**create_args)
 
 
 class OpenRouterProvider(Provider):

@@ -1,3 +1,5 @@
+from release.common import Msg
+
 from .base import GetPydanticStream, GetTextStream, Provider
 from .msg_content import Part, normalize_messages
 
@@ -10,7 +12,7 @@ from pydantic import BaseModel
 from dataclasses import dataclass
 import mimetypes
 import os
-from typing import Literal
+from typing import Literal, Sequence, cast
 
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
@@ -64,9 +66,11 @@ def _config_from_metadata(
     return config
 
 
-def _to_messages(request: "Provider.TextStream.Request"):
+def _to_messages(
+    request: "Provider.TextStream.Request | Provider.PydanticStream.Request",
+) -> tuple[Sequence[genai_types.Content], genai_types.GenerateContentConfigDict | None]:
     system_prompt, normalized = normalize_messages(request.messages)
-    contents: list[genai_types.Content] = []
+    contents: Sequence[genai_types.Content] = []
 
     for message in normalized:
         parts: list[genai_types.Part] = []
@@ -154,10 +158,12 @@ async def produce_raw_chunks(request: "Provider.TextStream.Request"):
 async def produce_pydantic_models[ModelT: BaseModel](
     request: "Provider.PydanticStream.Request[ModelT]",
 ):
-    return instructor_client.chat.completions.create_partial(
+    contents, config = _to_messages(request)
+    return instructor_client.create_partial(
+        config=config,
         response_model=request.type,
         model=request.model,
-        messages=request.messages,
+        messages=cast(list[Msg], contents),
     )
 
 
