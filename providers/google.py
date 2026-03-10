@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from dataclasses import dataclass
 import mimetypes
 import os
+from typing import Literal
 
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
@@ -18,13 +19,34 @@ client = genai.Client(api_key=api_key)
 instructor_client = instructor.from_genai(client, use_async=True)
 
 
-@dataclass(frozen=True, kw_only=True)
-class GoogleModelMetadata:
-    thinking_level: genai_types.ThinkingLevel | None = None
+type ThinkingLevelValue = Literal[
+    "low",
+    "medium",
+    "high",
+    "minimal",
+    "unspecified",
+]
+
+
+def _to_thinking_level_enum(
+    thinking_level: ThinkingLevelValue | None,
+) -> genai_types.ThinkingLevel | None:
+    if thinking_level is None or thinking_level == "":
+        return None
+
+    level_map: dict[ThinkingLevelValue, genai_types.ThinkingLevel] = {
+        "low": genai_types.ThinkingLevel.LOW,
+        "medium": genai_types.ThinkingLevel.MEDIUM,
+        "high": genai_types.ThinkingLevel.HIGH,
+        "minimal": genai_types.ThinkingLevel.MINIMAL,
+        "unspecified": genai_types.ThinkingLevel.THINKING_LEVEL_UNSPECIFIED,
+    }
+
+    return level_map[thinking_level]
 
 
 def _config_from_metadata(
-    model_metadata: GoogleModelMetadata | None,
+    model_metadata: "GoogleProvider.ModelMetadata | None",
 ) -> genai_types.GenerateContentConfigDict:
     config: genai_types.GenerateContentConfigDict = {}
     if model_metadata is None:
@@ -32,8 +54,9 @@ def _config_from_metadata(
 
     thinking_config: genai_types.ThinkingConfigDict = {}
 
-    if model_metadata.thinking_level is not None:
-        thinking_config["thinking_level"] = model_metadata.thinking_level
+    enum_thinking_level = _to_thinking_level_enum(model_metadata.thinking_level)
+    if enum_thinking_level is not None:
+        thinking_config["thinking_level"] = enum_thinking_level
 
     if thinking_config:
         config["thinking_config"] = thinking_config
@@ -85,7 +108,7 @@ def _to_messages(request: "Provider.TextStream.Request"):
         )
 
     config = _config_from_metadata(
-        Provider.model_metadata(request, GoogleModelMetadata)
+        Provider.model_metadata(request, GoogleProvider.ModelMetadata)
     )
     if system_prompt:
         config["system_instruction"] = system_prompt
@@ -139,6 +162,10 @@ async def produce_pydantic_models[ModelT: BaseModel](
 
 
 class GoogleProvider(Provider):
+    @dataclass(frozen=True, kw_only=True)
+    class ModelMetadata:
+        thinking_level: ThinkingLevelValue | None = None
+
     async def try_prepare_text_stream(self, request) -> GetTextStream | None:
         if not request.model.startswith(("gemini", "learnlm")):
             return None

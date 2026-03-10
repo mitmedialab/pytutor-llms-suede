@@ -23,11 +23,6 @@ client = AsyncAnthropic(api_key=api_key)
 instructor_client = instructor.from_anthropic(client)
 
 
-@dataclass(frozen=True, kw_only=True)
-class AnthropicModelMetadata:
-    max_tokens: int | None = None
-
-
 SUPPORTED_IMAGE_MEDIA_TYPES = {
     "image/jpeg",
     "image/png",
@@ -102,7 +97,9 @@ def delta_content_from_chunk(chunk: RawMessageStreamEvent) -> str | None:
 
 async def produce_raw_chunks(request: "Provider.TextStream.Request"):
     system_prompt, messages = _to_messages(request)
-    anthropic_metadata = Provider.model_metadata(request, AnthropicModelMetadata)
+    anthropic_metadata = Provider.model_metadata(
+        request, AnthropicProvider.ModelMetadata
+    )
     max_tokens = (
         anthropic_metadata.max_tokens
         if anthropic_metadata and anthropic_metadata.max_tokens is not None
@@ -124,7 +121,9 @@ async def produce_raw_chunks(request: "Provider.TextStream.Request"):
 async def produce_pydantic_models[ModelT: BaseModel](
     request: "Provider.PydanticStream.Request[ModelT]",
 ):
-    anthropic_metadata = Provider.model_metadata(request, AnthropicModelMetadata)
+    anthropic_metadata = Provider.model_metadata(
+        request, AnthropicProvider.ModelMetadata
+    )
     max_tokens = (
         anthropic_metadata.max_tokens
         if anthropic_metadata and anthropic_metadata.max_tokens is not None
@@ -140,6 +139,10 @@ async def produce_pydantic_models[ModelT: BaseModel](
 
 
 class AnthropicProvider(Provider):
+    @dataclass(frozen=True, kw_only=True)
+    class ModelMetadata:
+        max_tokens: int | None = None
+
     async def try_prepare_text_stream(self, request) -> GetTextStream | None:
         if not request.model.startswith("claude"):
             return None

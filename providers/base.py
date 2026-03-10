@@ -18,16 +18,16 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from .anthropic import AnthropicModelMetadata
-    from .google import GoogleModelMetadata
+    from .anthropic import AnthropicProvider
+    from .google import GoogleProvider
     from .openai import OpenAIProvider
-    from .openrouter import OpenRouterModelMetadata
+    from .openrouter import OpenRouterProvider
 
     type ModelMetadata = (
         OpenAIProvider.ModelMetadata
-        | AnthropicModelMetadata
-        | GoogleModelMetadata
-        | OpenRouterModelMetadata
+        | AnthropicProvider.ModelMetadata
+        | GoogleProvider.ModelMetadata
+        | OpenRouterProvider.ModelMetadata
     )
 else:
     type ModelMetadata = object
