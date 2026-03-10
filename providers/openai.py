@@ -42,7 +42,7 @@ async def produce_raw_chunks(request: "Provider.TextStream.Request"):
 async def produce_pydantic_models[ModelT: BaseModel](
     request: "Provider.PydanticStream.Request[ModelT]",
 ):
-    return instructor_client.chat.completions.create_partial(
+    return instructor_client.create_partial(
         response_model=request.type,
         model=request.model,
         messages=request.messages,

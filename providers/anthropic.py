@@ -130,7 +130,7 @@ async def produce_pydantic_models[ModelT: BaseModel](
         else 4096
     )
 
-    return instructor_client.chat.completions.create_partial(
+    return instructor_client.create_partial(
         response_model=request.type,
         model=request.model,
         messages=request.messages,
