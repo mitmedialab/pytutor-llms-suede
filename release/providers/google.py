@@ -1,5 +1,4 @@
-from release.common import Msg
-
+from ..common import Msg
 from .base import GetPydanticStream, GetTextStream, Provider
 from .msg_content import Part, normalize_messages
 
